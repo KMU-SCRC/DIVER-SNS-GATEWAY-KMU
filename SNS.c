@@ -81,7 +81,7 @@ int main(void)
     char input[100];
     char* temp;
     char chunk_temp[1000];
-    char ID[100];
+    char ID[200];
     char* ID_CODE;
     char POST_URL[100];
 
@@ -111,10 +111,18 @@ int main(void)
         }
 
         while (!quit) {//로그인
+#ifdef _WIN32
             printf("선택하세요.\n1.로그인\n2.종료\n");
+#else
+            printf("MENU\n1.LOGIN\n2.EXIT\n");
+#endif
             scanf("%s", input);
             if (strcmp(input, "1") == 0) {
+#ifdef _WIN32
                 printf("아이디를 입력해주세요.\n");
+#else
+                printf("ID\n");
+#endif
                 scanf("%s", input);
                 sprintf(ID, "http://52.78.83.63:8080/api/users/user?email=%s",input);
 
@@ -134,8 +142,19 @@ int main(void)
                 free(chunk.memory);
                 chunk.memory = malloc(1);
                 chunk.size = 0;
-                if (strcmp(temp, "id") == 0) {
+                if (temp == NULL) {
+#ifdef _WIN32
+                    printf("존재하지 않는 아이디입니다.\n");
+#else
+                    printf("INCORRECT ID\n");
+#endif
+                }
+                else if (strcmp(temp, "id") == 0) {
+#ifdef _WIN32
                     printf("로그인 성공\n");
+#else
+                    printf("LOGIN SUCCESS\n");
+#endif
                     ID_CODE = strtok(NULL, " {}\":,");
                     sprintf(POST_URL, "http://52.78.83.63:8080/api/underwater/%s", ID_CODE);
                     //printf("유알엘:%s\n",POST_URL);
@@ -143,17 +162,29 @@ int main(void)
                     break;
                 }
                 else {
+#ifdef _WIN32
                     printf("존재하지 않는 아이디입니다.\n");
+#else
+                    printf("INCORRECT ID\n");
+#endif
                 }
 
             }
             else if (strcmp(input, "2") == 0) {
                 quit = 1;
+#ifdef _WIN32
                 printf("종료합니다.\n");
+#else
+                printf("EXIT\n");
+#endif
                 break;
             }
             else {
+#ifdef _WIN32
                 printf("잘 못 된 입력입니다. 다시 입력해주세요.\n");
+#else
+                printf("INCORRECT NUMBER\n");
+#endif
             }
         }
 
@@ -162,21 +193,37 @@ int main(void)
         }
 
         while (!quit) {//데이터송수신
+#ifdef _WIN32
             printf("선택하세요.\n1.로그아웃\n2.시리얼 데이터 수신\n3.수중 데이터 서버 전송\n4.종료\n");
+#else
+            printf("MENU\n1.LOGOUT\n2.READ DATA\n3.SEND DATA\n4.EXIT\n");
+#endif
             scanf("%s", input);
             if (strcmp(input, "1") == 0) {
+#ifdef _WIN32
                 printf("로그아웃합니다.\n");
+#else
+                printf("LOGOUT\n");
+#endif
                 break;
             }
             else if (strcmp(input, "2") == 0) {
+#ifdef _WIN32
                 printf("데이터를 수신합니다.\n");
+#else
+                printf("READ DATA\n");
+#endif
                 sprintf(name, "test2");
                 sprintf(date, "2023");
                 sprintf(postthis, "{\"name\": \"%s\", \"date\": \"%s\", \"acceleration\": \"%s\", \"gaussMagnetic\": \"%s\", \"angularRate\": \"%s\", \"underwaterMicrophone\": \"%s\", \"gesture\": \"%s\", \"proximity\": \"%s\", \"dryAmbientLight\": \"%s\", \"dryAmbientRGB\": \"%s\", \"dryBarometricPressure\": \"%s\", \"dryTemperature\": \"%s\", \"dryHumidity\": \"%s\", \"underwaterPressure\": \"%s\", \"underwaterTemperature\": \"%s\", \"underwaterDepth\": \"%s\", \"seaLevelAltitude\": \"%s\", \"underwaterPictureLow\": \"%s\", \"underwaterPictureHigh\": \"%s\", \"underwaterVideoWithoutMic\": \"%s\", \"underwaterVideoWithMic\": \"%s\", \"gnss\": \"%s\"}", name, date, acceleration, gaussMagnetic, angularRate, underwaterMicrophone, gesture, proximity, dryAmbientLight, dryAmbientRGB, dryBarometricPressure, dryTemperature, dryHumidity, underwaterPressure, underwaterTemperature, underwaterDepth, seaLevelAltitude, underwaterPictureLow, underwaterPictureHigh, underwaterVideoWithoutMic, underwaterVideoWithMic, gnss);
                 //sprintf(postthis, "{\"name\": \"%s\", \"date\": \"%s\"}",name,date);
             }
             else if (strcmp(input, "3") == 0) {
-                printf("데이터 송신합니다.\n");
+#ifdef _WIN32
+                printf("데이터를 송신합니다.\n");
+#else
+                printf("SEND DATA\n");
+#endif
                 curl_easy_setopt(curl_post, CURLOPT_POSTFIELDS, postthis);
 
                 /* Perform the request, res will get the return code */
@@ -195,20 +242,36 @@ int main(void)
                 chunk.memory = malloc(1);
                 chunk.size = 0;
                 if (gnum == 0) {
+#ifdef _WIN32
                     printf("데이터 전송에 실패했습니다.\n");
+#else
+                    printf("FAIL\n");
+#endif
                 }
                 else {
+#ifdef _WIN32
                     printf("%d번째 수중 데이터 업로드 완료되었습니다.\n", gnum);
+#else
+                    printf("SUCCESS\n");
+#endif
                 }
 
             }
             else if (strcmp(input, "4") == 0) {
                 quit = 1;
+#ifdef _WIN32
                 printf("종료합니다.\n");
+#else
+                printf("EXIT\n");
+#endif
                 break;
             }
             else {
+#ifdef _WIN32
                 printf("잘 못 된 입력입니다. 다시 입력해주세요.\n");
+#else
+                printf("INCORRECT NUMBER\n");
+#endif
             }
         }
 
