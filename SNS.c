@@ -9,7 +9,16 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <signal.h>
 #include <curl/curl.h>
+
+#ifndef _WIN32
+// Linux headers
+#include <fcntl.h> // Contains file controls like O_RDWR
+#include <termios.h> // Contains POSIX terminal control definitions
+#include <unistd.h> // write(), read(), close()
+#endif
+int quit = 0;
 
 struct MemoryStruct {
     char* memory;
@@ -37,12 +46,38 @@ WriteMemoryCallback(void* contents, size_t size, size_t nmemb, void* userp)
     return realsize;
 }
 
+void MakeDirectory(unsigned char* full_path)
+{
+    unsigned char temp[256], * sp;
+    strcpy(temp, full_path); // 경로문자열을 복사
+    sp = temp; // 포인터를 문자열 처음으로
+
+    while ((sp = strchr(sp, '\\'))) { // 디렉토리 구분자를 찾았으면
+        if (sp > temp && *(sp - 1) != ':') { // 루트디렉토리가 아니면
+            *sp = '\0'; // 잠시 문자열 끝으로 설정
+#ifdef _WIN32
+            _mkdir(temp);
+#else
+            mkdir(temp, 0777);
+#endif
+            // 디렉토리를 만들고 (존재하지 않을 때)
+            * sp = '\\'; // 문자열을 원래대로 복귀
+        }
+        sp++; // 포인터를 다음 문자로 이동
+    }
+
+}
+
+static void
+handle_sigint(int signum) {
+    quit = 1;
+}
+
 int main(void)
 {
     CURL* curl_get;
     CURL* curl_post;
     CURLcode res;
-    int quit = 0;
     int init = 0;
     int gnum = 0;
 
@@ -55,15 +90,15 @@ int main(void)
     headerlist = curl_slist_append(headerlist, "Content-Type: application/json");
 
     char name[100] = "test1";
-    char date[100] = "2023";
-    char acceleration[10] = "0.1";
-    char gaussMagnetic[10] = "0.1";
-    char angularRate[10] = "0.1";
+    char date[100] = "2023-01-03T00:00:00.0000";
+    char acceleration[30] = "1.00,-0.19,0.14";
+    char gaussMagnetic[30] = "4.91,-14.87,25.15";
+    char angularRate[30] = "0.18,0.49,0.79";
     char underwaterMicrophone[10] = "0.1";
     char gesture[10] = "0.1";
     char proximity[10] = "0.1";
     char dryAmbientLight[10] = "0.1";
-    char dryAmbientRGB[10] = "0.1";
+    char dryAmbientRGB[30] = "R.20,G.20,B.19";
     char dryBarometricPressure[10] = "0.1";
     char dryTemperature[10] = "0.1";
     char dryHumidity[10] = "0.1";
@@ -75,7 +110,7 @@ int main(void)
     char underwaterPictureHigh[10] = "0.1";
     char underwaterVideoWithoutMic[10] = "0.1";
     char underwaterVideoWithMic[10] = "0.1";
-    char gnss[10] = "0.1";
+    char gnss[100] = "GNGGA,053008.095,,,,,0,0,,,M,,M,,*54";
 
     char postthis[1000] = "{\"name\": \"test1\", \"date\": \"2023\", \"acceleration\": \"0.1\", \"gaussMagnetic\": \"0.1\", \"angularRate\": \"0.1\", \"underwaterMicrophone\": \"0.1\", \"gesture\": \"0.1\", \"proximity\": \"0.1\", \"dryAmbientLight\": \"0.1\", \"dryAmbientRGB\": \"0.1\", \"dryBarometricPressure\": \"0.1\", \"dryTemperature\": \"0.1\", \"dryHumidity\": \"0.1\", \"underwaterPressure\": \"0.1\", \"underwaterTemperature\": \"0.1\", \"underwaterDepth\": \"0.1\", \"seaLevelAltitude\": \"0.1\", \"underwaterPictureLow\": \"0.1\", \"underwaterPictureHigh\": \"0.1\", \"underwaterVideoWithoutMic\": \"0.1\", \"underwaterVideoWithMic\": \"0.1\", \"gnss\": \"0.1\"}";
     char input[100];
@@ -87,7 +122,178 @@ int main(void)
 
     curl_get= curl_easy_init();
     curl_post = curl_easy_init();
+
+#ifndef _WIN32
+    struct sigaction sa;
+    struct termios SENSORnewtio;
+    struct termios GPSnewtio;
+    int SENSORttyfd = 0;
+    int GPSttyfd = 0;
+    int SENSORi = 0;
+    int GPSi = 0;
+    int cc = 0;
+    int GPSc = 0;
+    int GPScc = 0;
+    char SENSORbuf[1024];
+    char GPSbuf[1024];
+    char SENSORM[1024];
+    char GPSM[1024];
+    char GPSMtemp[1024];
+    char* SENSORtemp;
+    char* GPStemp;
+    char* GPStempd;
+    char* SENSORttyname = "/dev/ttyACM0";
+    char* GPSttyname = "/dev/ttyS3";
+    SENSORttyfd = open(SENSORttyname, O_RDWR | O_NOCTTY);
+    GPSttyfd = open(GPSttyname, O_RDWR | O_NOCTTY);
+
+    if (SENSORttyfd < 0)
+    {
+        printf(">> tty Open Fail [%s]\r\n ", SENSORttyname);
+        return -1;
+    }
+
+    if (GPSttyfd < 0)
+    {
+        printf(">> tty Open Fail [%s]\r\n ", GPSttyname);
+        return -1;
+    }
+
+    memset(&SENSORnewtio, 0, sizeof(SENSORnewtio));
+    memset(&GPSnewtio, 0, sizeof(GPSnewtio));
+
+    SENSORnewtio.c_cflag = B9600 | CS8 | CLOCAL | CREAD | CRTSCTS;
+    SENSORnewtio.c_iflag = IGNPAR;
+    SENSORnewtio.c_oflag = 0;
+
+    //set input mode (non-canonical, no echo,.....)
+    SENSORnewtio.c_lflag = 0;     // LF recive filter unused
+    SENSORnewtio.c_cc[VTIME] = 0;     // inter charater timer unused
+    SENSORnewtio.c_cc[VMIN] = 0;     // blocking read until 1 character arrives
+
+    GPSnewtio.c_cflag = B9600 | CS8 | CLOCAL | CREAD | CRTSCTS;
+    GPSnewtio.c_iflag = IGNPAR;
+    GPSnewtio.c_oflag = 0;
+
+    //set input mode (non-canonical, no echo,.....)
+    GPSnewtio.c_lflag = 0;     // LF recive filter unused
+    GPSnewtio.c_cc[VTIME] = 0;     // inter charater timer unused
+    GPSnewtio.c_cc[VMIN] = 0;     // blocking read until 1 character arrives
+
+    tcflush(SENSORttyfd, TCIFLUSH); // inital serial port
+    tcsetattr(SENSORttyfd, TCSANOW, &SENSORnewtio); // setting serial communication
+
+    tcflush(GPSttyfd, TCIFLUSH); // inital serial port
+    tcsetattr(GPSttyfd, TCSANOW, &GPSnewtio); // setting serial communication
+
+    //printf("## ttyo1 Opened [%s]\r\n", ttyname);
+    while (1) {
+        //printf("check1\n");
+        SENSORi = read(SENSORttyfd, SENSORbuf, 1024);
+        SENSORbuf[SENSORi] = '\0';
+        //printf("check2\n");
+        GPSi = read(GPSttyfd, GPSbuf, 1024);
+        GPSbuf[GPSi] = '\0';
+        //printf("check3\n");
+        //printf("%s", buf);
+        if (cc > 2) {
+            sprintf(SENSORM, SENSORbuf);
+            sprintf(GPSM, GPSbuf);
+
+            SENSORtemp = strtok(SENSORM, "=\n");
+            while (1) {
+                //printf("sensor while\n");
+                if (SENSORtemp == NULL) {
+                    break;
+                }
+                else if (strcmp(SENSORtemp, "acceleration") == 0) {
+                    sprintf(acceleration, strtok(NULL, "=\n"));
+                    //printf("%s\n", acceleration);
+                }
+                else if (strcmp(SENSORtemp, "angularRate") == 0) {
+                    sprintf(angularRate, strtok(NULL, "=\n"));
+                    //printf("%s\n", angularRate);
+                }
+                else if (strcmp(SENSORtemp, "gaussMagnetic") == 0) {
+                    sprintf(gaussMagnetic, strtok(NULL, "=\n"));
+                    //printf("%s\n", gaussMagnetic);
+                }
+                else if (strcmp(SENSORtemp, "dryBarometricPressure") == 0) {
+                    sprintf(dryBarometricPressure, strtok(NULL, "=\n"));
+                    //printf("%s\n", dryBarometricPressure);
+                }
+                else if (strcmp(SENSORtemp, "dryTemperature") == 0) {
+                    sprintf(dryTemperature, strtok(NULL, "=\n"));
+                    //printf("%s\n", dryTemperature);
+                }
+                else if (strcmp(SENSORtemp, "dryHumidity") == 0) {
+                    sprintf(dryHumidity, strtok(NULL, "=\n"));
+                    //printf("%s\n", dryHumidity);
+                }
+                else if (strcmp(SENSORtemp, "proximity") == 0) {
+                    sprintf(proximity, strtok(NULL, "=\n"));
+                    //printf("%s\n", proximity);
+                }
+                else if (strcmp(SENSORtemp, "dryAmbientRGB") == 0) {
+                    sprintf(dryAmbientRGB, strtok(NULL, "=\n"));
+                    //printf("%s\n", dryAmbientRGB);
+                }
+                SENSORtemp = strtok(NULL, "=\n");
+            }
+
+            while (1) {
+                //printf("gps while\n");
+                GPStemp = strtok(GPSM, "$\n");
+                while (GPSc < GPScc) {
+                    GPStemp = strtok(NULL, "$\n");
+                    GPSc++;
+                }
+                if (GPStemp == NULL) {
+                    break;
+                }
+                else {
+                    sprintf(GPSMtemp, GPStemp);
+                    GPStempd = strtok(GPStemp, ",");
+                    if (strcmp(GPStempd, "GNGGA") == 0) {
+                        sprintf(gnss, GPSMtemp);
+                        //printf("%s\n", gnss);
+                        break;
+                    }
+                }
+                GPScc++;
+                GPSc = 0;
+            }
+            break;
+        }
+        //printf("check4\n");
+        sleep(1);
+        //printf("check5\n");
+        cc++;
+        //printf("check6\n");
+    }
+
+    // 아래 부분은 테스트 코드 전용으로 실제로 사용하실때는 삭제바랍니다
+    //close(SENSORttyfd); //close serial port
+    //close(GPSttyfd); //close serial port
+    //return 0;
+#endif
+
+#ifdef _WIN32
+    signal(SIGINT, handle_sigint);
+#else
+    memset(&sa, 0, sizeof(sa));
+    sigemptyset(&sa.sa_mask);
+    sa.sa_handler = handle_sigint;
+    sa.sa_flags = 0;
+    sigaction(SIGINT, &sa, NULL);
+    sigaction(SIGTERM, &sa, NULL);
+    /* So we do not exit on a SIGPIPE */
+    sa.sa_handler = SIG_IGN;
+    sigaction(SIGPIPE, &sa, NULL);
+#endif
+
     if (!curl_get&&!curl_post) {
+        printf("curl error\n");
         quit = 1;
     }
     while (!quit) {
@@ -213,6 +419,117 @@ int main(void)
 #else
                 printf("READ DATA\n");
 #endif
+#ifdef _WIN32
+                sprintf(acceleration, "1.02,-0.17,0.19");
+                sprintf(angularRate, "0.22,0.78,0.87");
+                sprintf(gaussMagnetic, "5.01,-13.38,25.24");
+                sprintf(dryBarometricPressure, "101.02");
+                sprintf(dryTemperature, "25.24");
+                sprintf(dryHumidity, "28.09");
+                sprintf(proximity, "252");
+                sprintf(dryAmbientRGB, "R.20,G.20,B.20");
+                sprintf(gnss, "GNGGA,053008.095,37.8847493,N,127.1720248,E,0,0,,,M,,M,,*54");
+#else
+                cc = 0;
+                GPSc = 0;
+                GPScc = 0;
+                while (1) {
+                    //printf("check1\n");
+                    SENSORi = read(SENSORttyfd, SENSORbuf, 1024);
+                    SENSORbuf[SENSORi] = '\0';
+                    //printf("check2\n");
+                    GPSi = read(GPSttyfd, GPSbuf, 1024);
+                    GPSbuf[GPSi] = '\0';
+                    //printf("check3\n");
+                    //printf("%s", buf);
+                    if (cc > 2) {
+                        sprintf(SENSORM, SENSORbuf);
+                        sprintf(GPSM, GPSbuf);
+
+                        SENSORtemp = strtok(SENSORM, "=\n");
+                        while (1) {
+                            //printf("sensor while\n");
+                            if (SENSORtemp == NULL) {
+                                break;
+                            }
+                            else if (strcmp(SENSORtemp, "acceleration") == 0) {
+                                sprintf(acceleration, strtok(NULL, "=\n"));
+                                //printf("%s\n", acceleration);
+                            }
+                            else if (strcmp(SENSORtemp, "angularRate") == 0) {
+                                sprintf(angularRate, strtok(NULL, "=\n"));
+                                //printf("%s\n", angularRate);
+                            }
+                            else if (strcmp(SENSORtemp, "gaussMagnetic") == 0) {
+                                sprintf(gaussMagnetic, strtok(NULL, "=\n"));
+                                //printf("%s\n", gaussMagnetic);
+                            }
+                            else if (strcmp(SENSORtemp, "dryBarometricPressure") == 0) {
+                                sprintf(dryBarometricPressure, strtok(NULL, "=\n"));
+                                //printf("%s\n", dryBarometricPressure);
+                            }
+                            else if (strcmp(SENSORtemp, "dryTemperature") == 0) {
+                                sprintf(dryTemperature, strtok(NULL, "=\n"));
+                                //printf("%s\n", dryTemperature);
+                            }
+                            else if (strcmp(SENSORtemp, "dryHumidity") == 0) {
+                                sprintf(dryHumidity, strtok(NULL, "=\n"));
+                                //printf("%s\n", dryHumidity);
+                            }
+                            else if (strcmp(SENSORtemp, "proximity") == 0) {
+                                sprintf(proximity, strtok(NULL, "=\n"));
+                                //printf("%s\n", proximity);
+                            }
+                            else if (strcmp(SENSORtemp, "dryAmbientRGB") == 0) {
+                                sprintf(dryAmbientRGB, strtok(NULL, "=\n"));
+                                //printf("%s\n", dryAmbientRGB);
+                            }
+                            SENSORtemp = strtok(NULL, "=\n");
+                        }
+
+                        while (1) {
+                            //printf("gps while\n");
+                            GPStemp = strtok(GPSM, "$\n");
+                            while (GPSc < GPScc) {
+                                GPStemp = strtok(NULL, "$\n");
+                                GPSc++;
+                            }
+                            if (GPStemp == NULL) {
+                                break;
+                            }
+                            else {
+                                sprintf(GPSMtemp, GPStemp);
+                                GPStempd = strtok(GPStemp, ",");
+                                if (strcmp(GPStempd, "GNGGA") == 0) {
+                                    sprintf(gnss, GPSMtemp);
+                                    //printf("%s\n", gnss);
+                                    break;
+                                }
+                            }
+                            GPScc++;
+                            GPSc = 0;
+                        }
+                        break;
+                    }
+                    //printf("check4\n");
+                    sleep(1);
+                    //printf("check5\n");
+                    cc++;
+                    //printf("check6\n");
+                }
+#endif
+                sprintf(underwaterMicrophone, "0.2");
+                sprintf(gesture, "0.2");
+                sprintf(dryAmbientLight, "0.2");
+                sprintf(underwaterPressure, "0.2");
+                sprintf(underwaterTemperature, "0.2");
+                sprintf(underwaterDepth, "0.2");
+                sprintf(seaLevelAltitude, "0.2");
+                sprintf(underwaterPictureLow, "0.2");
+                sprintf(underwaterPictureHigh, "0.2");
+                sprintf(underwaterVideoWithoutMic, "0.2");
+                sprintf(underwaterVideoWithMic, "0.2");
+
                 sprintf(name, "test2");
                 sprintf(date, "2023");
                 sprintf(postthis, "{\"name\": \"%s\", \"date\": \"%s\", \"acceleration\": \"%s\", \"gaussMagnetic\": \"%s\", \"angularRate\": \"%s\", \"underwaterMicrophone\": \"%s\", \"gesture\": \"%s\", \"proximity\": \"%s\", \"dryAmbientLight\": \"%s\", \"dryAmbientRGB\": \"%s\", \"dryBarometricPressure\": \"%s\", \"dryTemperature\": \"%s\", \"dryHumidity\": \"%s\", \"underwaterPressure\": \"%s\", \"underwaterTemperature\": \"%s\", \"underwaterDepth\": \"%s\", \"seaLevelAltitude\": \"%s\", \"underwaterPictureLow\": \"%s\", \"underwaterPictureHigh\": \"%s\", \"underwaterVideoWithoutMic\": \"%s\", \"underwaterVideoWithMic\": \"%s\", \"gnss\": \"%s\"}", name, date, acceleration, gaussMagnetic, angularRate, underwaterMicrophone, gesture, proximity, dryAmbientLight, dryAmbientRGB, dryBarometricPressure, dryTemperature, dryHumidity, underwaterPressure, underwaterTemperature, underwaterDepth, seaLevelAltitude, underwaterPictureLow, underwaterPictureHigh, underwaterVideoWithoutMic, underwaterVideoWithMic, gnss);
@@ -250,7 +567,8 @@ int main(void)
                 }
                 else {
 #ifdef _WIN32
-                    printf("%d번째 수중 데이터 업로드 완료되었습니다.\n", gnum);
+                    //printf("%d번째 수중 데이터 업로드 완료되었습니다.\n", gnum);
+                    printf("데이터 전송에 성공했습니다.\n");
 #else
                     printf("SUCCESS\n");
 #endif
@@ -290,5 +608,9 @@ int main(void)
     //printf("빠져나옴4\n");
     curl_slist_free_all(headerlist);
     //printf("빠져나옴5\n");
+#ifndef _WIN32
+    close(SENSORttyfd); //close serial port
+    close(GPSttyfd); //close serial port
+#endif
     return 0;
 }
