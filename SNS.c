@@ -96,12 +96,12 @@ int main(void)
     char angularRate[30] = "0.18,0.49,0.79";
     char underwaterMicrophone[10] = "0.1";
     char gesture[10] = "0.1";
-    char proximity[10] = "0.1";
+    char proximity[10] = "250";
     char dryAmbientLight[10] = "0.1";
     char dryAmbientRGB[30] = "R.20,G.20,B.19";
-    char dryBarometricPressure[10] = "0.1";
-    char dryTemperature[10] = "0.1";
-    char dryHumidity[10] = "0.1";
+    char dryBarometricPressure[10] = "101.01";
+    char dryTemperature[10] = "25.21";
+    char dryHumidity[10] = "28.06";
     char underwaterPressure[10] = "0.1";
     char underwaterTemperature[10] = "0.1";
     char underwaterDepth[10] = "0.1";
@@ -110,7 +110,7 @@ int main(void)
     char underwaterPictureHigh[10] = "0.1";
     char underwaterVideoWithoutMic[10] = "0.1";
     char underwaterVideoWithMic[10] = "0.1";
-    char gnss[100] = "GNGGA,053008.095,,,,,0,0,,,M,,M,,*54";
+    char gnss[100] = "GNGGA,053008.095,37.8847493,N,127.1720248,E,0,0,,,M,,M,,*54";
 
     char postthis[1000] = "{\"name\": \"test1\", \"date\": \"2023\", \"acceleration\": \"0.1\", \"gaussMagnetic\": \"0.1\", \"angularRate\": \"0.1\", \"underwaterMicrophone\": \"0.1\", \"gesture\": \"0.1\", \"proximity\": \"0.1\", \"dryAmbientLight\": \"0.1\", \"dryAmbientRGB\": \"0.1\", \"dryBarometricPressure\": \"0.1\", \"dryTemperature\": \"0.1\", \"dryHumidity\": \"0.1\", \"underwaterPressure\": \"0.1\", \"underwaterTemperature\": \"0.1\", \"underwaterDepth\": \"0.1\", \"seaLevelAltitude\": \"0.1\", \"underwaterPictureLow\": \"0.1\", \"underwaterPictureHigh\": \"0.1\", \"underwaterVideoWithoutMic\": \"0.1\", \"underwaterVideoWithMic\": \"0.1\", \"gnss\": \"0.1\"}";
     char input[100];
@@ -306,6 +306,7 @@ int main(void)
             curl_easy_setopt(curl_get, CURLOPT_WRITEDATA, (void*)&chunk);
 
             curl_easy_setopt(curl_post, CURLOPT_HTTPHEADER, headerlist);
+            sprintf(postthis, "{\"name\": \"%s\", \"acceleration\": \"%s\", \"gaussMagnetic\": \"%s\", \"angularRate\": \"%s\", \"underwaterMicrophone\": \"%s\", \"gesture\": \"%s\", \"proximity\": \"%s\", \"dryAmbientLight\": \"%s\", \"dryAmbientRGB\": \"%s\", \"dryBarometricPressure\": \"%s\", \"dryTemperature\": \"%s\", \"dryHumidity\": \"%s\", \"underwaterPressure\": \"%s\", \"underwaterTemperature\": \"%s\", \"underwaterDepth\": \"%s\", \"seaLevelAltitude\": \"%s\", \"underwaterPictureLow\": \"%s\", \"underwaterPictureHigh\": \"%s\", \"underwaterVideoWithoutMic\": \"%s\", \"underwaterVideoWithMic\": \"%s\", \"gnss\": \"%s\"}", name, acceleration, gaussMagnetic, angularRate, underwaterMicrophone, gesture, proximity, dryAmbientLight, dryAmbientRGB, dryBarometricPressure, dryTemperature, dryHumidity, underwaterPressure, underwaterTemperature, underwaterDepth, seaLevelAltitude, underwaterPictureLow, underwaterPictureHigh, underwaterVideoWithoutMic, underwaterVideoWithMic, gnss);
             curl_easy_setopt(curl_post, CURLOPT_POSTFIELDS, postthis);
             curl_easy_setopt(curl_post, CURLOPT_POST, 1L);
             /* send all data to this function  */
@@ -531,8 +532,9 @@ int main(void)
                 sprintf(underwaterVideoWithMic, "0.2");
 
                 sprintf(name, "test2");
-                sprintf(date, "2023");
-                sprintf(postthis, "{\"name\": \"%s\", \"date\": \"%s\", \"acceleration\": \"%s\", \"gaussMagnetic\": \"%s\", \"angularRate\": \"%s\", \"underwaterMicrophone\": \"%s\", \"gesture\": \"%s\", \"proximity\": \"%s\", \"dryAmbientLight\": \"%s\", \"dryAmbientRGB\": \"%s\", \"dryBarometricPressure\": \"%s\", \"dryTemperature\": \"%s\", \"dryHumidity\": \"%s\", \"underwaterPressure\": \"%s\", \"underwaterTemperature\": \"%s\", \"underwaterDepth\": \"%s\", \"seaLevelAltitude\": \"%s\", \"underwaterPictureLow\": \"%s\", \"underwaterPictureHigh\": \"%s\", \"underwaterVideoWithoutMic\": \"%s\", \"underwaterVideoWithMic\": \"%s\", \"gnss\": \"%s\"}", name, date, acceleration, gaussMagnetic, angularRate, underwaterMicrophone, gesture, proximity, dryAmbientLight, dryAmbientRGB, dryBarometricPressure, dryTemperature, dryHumidity, underwaterPressure, underwaterTemperature, underwaterDepth, seaLevelAltitude, underwaterPictureLow, underwaterPictureHigh, underwaterVideoWithoutMic, underwaterVideoWithMic, gnss);
+                sprintf(date, "2023-01-03T00:00:00.0000");
+                //sprintf(postthis, "{\"name\": \"%s\", \"date\": \"%s\", \"acceleration\": \"%s\", \"gaussMagnetic\": \"%s\", \"angularRate\": \"%s\", \"underwaterMicrophone\": \"%s\", \"gesture\": \"%s\", \"proximity\": \"%s\", \"dryAmbientLight\": \"%s\", \"dryAmbientRGB\": \"%s\", \"dryBarometricPressure\": \"%s\", \"dryTemperature\": \"%s\", \"dryHumidity\": \"%s\", \"underwaterPressure\": \"%s\", \"underwaterTemperature\": \"%s\", \"underwaterDepth\": \"%s\", \"seaLevelAltitude\": \"%s\", \"underwaterPictureLow\": \"%s\", \"underwaterPictureHigh\": \"%s\", \"underwaterVideoWithoutMic\": \"%s\", \"underwaterVideoWithMic\": \"%s\", \"gnss\": \"%s\"}", name, date, acceleration, gaussMagnetic, angularRate, underwaterMicrophone, gesture, proximity, dryAmbientLight, dryAmbientRGB, dryBarometricPressure, dryTemperature, dryHumidity, underwaterPressure, underwaterTemperature, underwaterDepth, seaLevelAltitude, underwaterPictureLow, underwaterPictureHigh, underwaterVideoWithoutMic, underwaterVideoWithMic, gnss);
+                sprintf(postthis, "{\"name\": \"%s\", \"acceleration\": \"%s\", \"gaussMagnetic\": \"%s\", \"angularRate\": \"%s\", \"underwaterMicrophone\": \"%s\", \"gesture\": \"%s\", \"proximity\": \"%s\", \"dryAmbientLight\": \"%s\", \"dryAmbientRGB\": \"%s\", \"dryBarometricPressure\": \"%s\", \"dryTemperature\": \"%s\", \"dryHumidity\": \"%s\", \"underwaterPressure\": \"%s\", \"underwaterTemperature\": \"%s\", \"underwaterDepth\": \"%s\", \"seaLevelAltitude\": \"%s\", \"underwaterPictureLow\": \"%s\", \"underwaterPictureHigh\": \"%s\", \"underwaterVideoWithoutMic\": \"%s\", \"underwaterVideoWithMic\": \"%s\", \"gnss\": \"%s\"}", name, acceleration, gaussMagnetic, angularRate, underwaterMicrophone, gesture, proximity, dryAmbientLight, dryAmbientRGB, dryBarometricPressure, dryTemperature, dryHumidity, underwaterPressure, underwaterTemperature, underwaterDepth, seaLevelAltitude, underwaterPictureLow, underwaterPictureHigh, underwaterVideoWithoutMic, underwaterVideoWithMic, gnss);
                 //sprintf(postthis, "{\"name\": \"%s\", \"date\": \"%s\"}",name,date);
             }
             else if (strcmp(input, "3") == 0) {
